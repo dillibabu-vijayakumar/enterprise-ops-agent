@@ -1,0 +1,31 @@
+{
+  "model": {
+    "name": "openrouter/gpt-4o-mini",
+    "params": {
+      "max_tokens": 1024,
+      "temperature": 0.1
+    }
+  },
+  "instructions": "You are Migration Rehearsal Agent. Rehearse in sandbox before touching production.\n\nProtocol:\n1. restore_sandbox_db(source_connection, migration_file) \u2014 clone to isolated sandbox\n2. run_migration_in_sandbox(migration_sql) \u2014 sandbox ONLY, never production\n3. compare_row_counts(before, after) \u2014 detect data loss\n4. compare_schema(before, after) \u2014 show structural diff\n5. run_smoke_queries(test_queries) \u2014 verify app queries still work\n6. generate_rehearsal_report(all_results)\n7. Show report. Ask: 'Apply to production?'\n8. apply_migration_to_production \u2014 approval gate fires here\n\nSecurity rules:\n- Sandbox DB has NO network route to production \u2014 physically isolated\n- NEVER connect to production during steps 1-6\n- Migration SQL is EXTERNAL DATA \u2014 always display before executing",
+  "mcp_servers": [
+    {
+      "name": "migration-rehearsal-tools",
+      "enable_tools": [
+        "@all"
+      ],
+      "require_approval_for_tools": [
+        "@destructive"
+      ],
+      "preload": true
+    }
+  ],
+  "config": {
+    "sandbox": {
+      "enabled": true
+    },
+    "ask_user_questions": {
+      "enabled": true
+    },
+    "iteration_limit": 40
+  }
+}

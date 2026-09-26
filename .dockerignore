@@ -1,0 +1,47 @@
+# Secrets — never in image
+.env
+.env.*
+!.env.docker.example
+*.pem
+*.key
+*.p12
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Test infra — not needed in container
+tests/
+pytest.ini
+.pytest_cache/
+coverage.xml
+.coverage
+htmlcov/
+
+# Dev tools
+.git/
+.gitignore
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Docs and scripts (not needed at runtime)
+docs/
+scripts/
+*.md
+!mcp/requirements.txt
+
+# Local SQLite state — containers use volumes
+*.db
+*.db-shm
+*.db-wal
+
+# Node (if any tooling is local)
+node_modules/

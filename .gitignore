@@ -1,0 +1,44 @@
+# Secrets — never commit
+.env
+.env.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# AWS credentials (should never be in repo)
+.aws/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg
+.pytest_cache/
+.mypy_cache/
+
+# Logs and PIDs written by start_servers.sh
+logs/
+*.pid
+*.log
+
+# Node (TrueForge)
+node_modules/
+.npm/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+
+# Temp clone dirs created by run_tests_in_sandbox
+release-captain-*/
+tmp/

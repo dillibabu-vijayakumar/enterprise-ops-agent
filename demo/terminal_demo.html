@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise Ops Agent — Live Demo Terminal</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #090D19;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Courier New', monospace;
+  padding: 2rem;
+}
+.window {
+  width: 900px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 40px 120px rgba(0,0,0,0.8);
+  border: 1px solid #1A2338;
+}
+.titlebar {
+  background: #1A2338;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot.r { background: #FF5F57; }
+.dot.y { background: #FFBD2E; }
+.dot.g { background: #28CA41; }
+.title-text {
+  margin-left: auto;
+  color: #3A5060;
+  font-size: 11px;
+}
+.terminal {
+  background: #060A14;
+  padding: 24px;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 560px;
+}
+.line {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 2px;
+  opacity: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.prompt  { color: #14F0A0; flex-shrink: 0; }
+.cmd     { color: #E0E8F5; }
+.out     { color: #4A8A6A; padding-left: 20px; }
+.route   { color: #4D9FEC; padding-left: 20px; }
+.block   { color: #FF5C38; padding-left: 20px; }
+.go      { color: #14F0A0; padding-left: 20px; }
+.warn    { color: #FFBD2E; padding-left: 20px; }
+.dim     { color: #1E3040; padding-left: 20px; }
+.cursor {
+  display: inline-block;
+  width: 8px; height: 14px;
+  background: #14F0A0;
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.badge {
+  display: inline-block;
+  background: rgba(20,240,160,0.15);
+  color: #14F0A0;
+  border: 1px solid rgba(20,240,160,0.3);
+  padding: 2px 8px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  margin-bottom: 16px;
+}
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <div class="dot r"></div>
+    <div class="dot y"></div>
+    <div class="dot g"></div>
+    <span class="title-text">enterprise-ops-agent — TrueForge Router</span>
+  </div>
+  <div class="terminal" id="term">
+    <div class="badge">TrueFoundry × Polaris Hackathon — Agents That Act</div>
+    <div id="lines"></div>
+  </div>
+</div>
+
+<script>
+const LINES = [
+  { cls: 'prompt cmd',  text: '❯ You: "Clean up idle AWS in us-east-1 and cut v2.4.0 release of myrepo"' },
+  { cls: 'out',  text: '→ classify_intent(user_request)', delay: 800 },
+  { cls: 'route',text: '  multi_intent: true', delay: 400 },
+  { cls: 'route',text: '  matched: [cloud-cost-janitor, release-captain]', delay: 300 },
+  { cls: 'out',  text: '→ invoke_subagents_parallel([...2 tasks...])', delay: 500 },
+  { cls: 'dim',  text: '─────────────────────────────────────────────────────────', delay: 400 },
+  { cls: 'out',  text: '[cloud-cost] list_idle_ec2(region="us-east-1", min_days=7)', delay: 300 },
+  { cls: 'go',   text: '[cloud-cost] → 28 stopped instances found', delay: 600 },
+  { cls: 'out',  text: '[cloud-cost] check_business_context("i-0a1b2c3d", ...)', delay: 400 },
+  { cls: 'block',text: '[cloud-cost] S2 BLOCK: Environment=production — auto-blocked', delay: 500 },
+  { cls: 'out',  text: '[cloud-cost] check_business_context("i-0x9y8z7w", ...)', delay: 400 },
+  { cls: 'block',text: '[cloud-cost] S1 BLOCK: Missing tags [CostCenter, Owner] — no owner', delay: 500 },
+  { cls: 'out',  text: '[cloud-cost] check_business_context("vol-0abc1234", ...)', delay: 400 },
+  { cls: 'go',   text: '[cloud-cost] GO: All 5 signals clear | idle 47d | no alarms | no deploys', delay: 600 },
+  { cls: 'go',   text: '[cloud-cost] Monthly waste identified: $1,847.20', delay: 500 },
+  { cls: 'out',  text: '[cloud-cost] generate_remediation_script(resources, dry_run=True)', delay: 400 },
+  { cls: 'go',   text: '[cloud-cost] boto3 script generated — 6 resources ready for review', delay: 400 },
+  { cls: 'dim',  text: '─────────────────────────────────────────────────────────', delay: 300 },
+  { cls: 'out',  text: '[release] list_commits_since_tag("myrepo", since_sha="abc123")', delay: 400 },
+  { cls: 'go',   text: '[release] → 34 commits, 2 breaking changes → semver: MAJOR bump', delay: 600 },
+  { cls: 'out',  text: '[release] check_release_blockers("myrepo")', delay: 400 },
+  { cls: 'go',   text: '[release] → 0 blockers, CI green on main', delay: 400 },
+  { cls: 'out',  text: '[release] run_tests_in_sandbox("myrepo", "main")', delay: 600 },
+  { cls: 'go',   text: '[release] → 47 tests passed (env: CI=true, no secrets in scope)', delay: 700 },
+  { cls: 'go',   text: '[release] Release notes drafted: v4.0.0 (MAJOR — breaking changes)', delay: 500 },
+  { cls: 'dim',  text: '─────────────────────────────────────────────────────────', delay: 300 },
+  { cls: 'warn', text: '⚠  TRUEFORGE APPROVAL GATE — human click required before proceeding', delay: 400 },
+  { cls: 'warn', text: '   [1] Delete vol-0abc1234 (ebs-volume, $18.40/mo, idle 47d)   [Approve] [Deny]', delay: 200 },
+  { cls: 'warn', text: '   [2] Delete eipalloc-0ab1 (elastic-ip, $3.60/mo)             [Approve] [Deny]', delay: 200 },
+  { cls: 'warn', text: '   [3] Publish GitHub release v4.0.0 for myrepo               [Approve] [Deny]', delay: 200 },
+  { cls: 'dim',  text: '─────────────────────────────────────────────────────────', delay: 600 },
+  { cls: 'go',   text: '✓ Human approved [1] [2] [3]', delay: 400 },
+  { cls: 'out',  text: '→ delete_resource("vol-0abc1234", "ebs-volume", "us-east-1")', delay: 300 },
+  { cls: 'go',   text: '  verified_state: deleted | audit: /janitor/deleted/vol-0abc1234', delay: 600 },
+  { cls: 'out',  text: '→ delete_resource("eipalloc-0ab1", "elastic-ip", "us-east-1")', delay: 300 },
+  { cls: 'go',   text: '  status: RELEASED | audit: /janitor/deleted/eipalloc-0ab1', delay: 500 },
+  { cls: 'out',  text: '→ publish_release("myrepo", release_id=98761234)', delay: 300 },
+  { cls: 'go',   text: '  status: published | tag: v4.0.0 | url: github.com/org/myrepo/releases/v4.0.0', delay: 600 },
+  { cls: 'dim',  text: '─────────────────────────────────────────────────────────', delay: 400 },
+  { cls: 'go',   text: '✓ Cloud Cost: $1,847/month recovered | 0 production resources touched', delay: 200 },
+  { cls: 'go',   text: '✓ Release: v4.0.0 shipped | breaking change surfaced before publish', delay: 200 },
+  { cls: 'go',   text: '✓ SSM audit trail written for all 2 deletions', delay: 200 },
+  { cls: 'prompt cmd', text: '❯ █', delay: 400 },
+];
+
+const container = document.getElementById('lines');
+let totalDelay = 600;
+
+for (const l of LINES) {
+  const div = document.createElement('div');
+  div.className = 'line';
+
+  // Handle multi-class
+  const classes = l.cls.split(' ');
+  classes.forEach(c => div.classList.add(c));
+
+  if (l.text === '❯ █') {
+    // final cursor line
+    const prompt = document.createElement('span');
+    prompt.className = 'prompt';
+    prompt.textContent = '❯ ';
+    const cur = document.createElement('span');
+    cur.className = 'cursor';
+    div.appendChild(prompt);
+    div.appendChild(cur);
+  } else if (l.cls.includes('prompt')) {
+    const prompt = document.createElement('span');
+    prompt.className = 'prompt';
+    prompt.textContent = l.text.startsWith('❯') ? '❯ ' : '';
+    const cmd = document.createElement('span');
+    cmd.className = 'cmd';
+    cmd.textContent = l.text.replace(/^❯ /, '');
+    div.appendChild(prompt);
+    div.appendChild(cmd);
+  } else {
+    div.textContent = l.text;
+  }
+
+  container.appendChild(div);
+
+  const delay = totalDelay;
+  totalDelay += (l.delay || 400);
+
+  setTimeout(() => {
+    div.style.opacity = '1';
+    div.style.transition = 'opacity 0.15s';
+    // auto-scroll
+    div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, delay);
+}
+</script>
+</body>
+</html>

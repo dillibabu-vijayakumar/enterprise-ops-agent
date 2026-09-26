@@ -1,0 +1,235 @@
+version: "3.9"
+
+# Enterprise Ops Agent — 6 MCP services
+# Each server: isolated container, shared network, credential-free environment
+#
+# Start: docker compose up
+# Test:  docker compose ps  (all services should be "healthy")
+
+x-mcp-defaults: &mcp-defaults
+  build:
+    context: .
+    dockerfile: mcp/Dockerfile
+  restart: unless-stopped
+  environment:
+    # NEVER pass real credentials here — use AWS instance profiles or IRSA in production
+    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    PYTHONUNBUFFERED: "1"
+    # Block outbound proxies in every container (matches subprocess isolation in code)
+    no_proxy: "*"
+    NO_PROXY: "*"
+    http_proxy: ""
+    https_proxy: ""
+    HTTP_PROXY: ""
+    HTTPS_PROXY: ""
+  networks:
+    - mcp-net
+  healthcheck:
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 10s
+
+services:
+  # ─── Router (port 8000) ───────────────────────────────────────────────────
+  router:
+    <<: *mcp-defaults
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+      args:
+        SERVER_MODULE: router.server
+        SERVER_PORT: "8000"
+    ports:
+      - "8000:8000"
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      PYTHONUNBUFFERED: "1"
+      no_proxy: "*"
+      NO_PROXY: "*"
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      TRUEFORGE_URL: ${TRUEFORGE_URL:-http://host.docker.internal:3000}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('localhost',8000),timeout=3); s.close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      cloud:
+        condition: service_healthy
+      github:
+        condition: service_healthy
+      iam:
+        condition: service_healthy
+      ticket:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+
+  # ─── Cloud Cost Janitor (port 8001) ──────────────────────────────────────
+  cloud:
+    <<: *mcp-defaults
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+      args:
+        SERVER_MODULE: cloud.server
+        SERVER_PORT: "8001"
+    ports:
+      - "8001:8001"
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-bhishmasec_stage}
+      PYTHONUNBUFFERED: "1"
+      no_proxy: "*"
+      NO_PROXY: "*"
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      AGENT_CALLER_ROLE: ${AGENT_CALLER_ROLE:-operator}
+      JANITOR_DB_PATH: /data/janitor_sessions.db
+    volumes:
+      - cloud-data:/data
+      - ${HOME}/.aws:/home/mcpuser/.aws:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('localhost',8001),timeout=3); s.close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ─── Release Captain / GitHub (port 8002) ────────────────────────────────
+  github:
+    <<: *mcp-defaults
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+      args:
+        SERVER_MODULE: github.server
+        SERVER_PORT: "8002"
+    ports:
+      - "8002:8002"
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      PYTHONUNBUFFERED: "1"
+      no_proxy: "*"
+      NO_PROXY: "*"
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      # GITHUB_TOKEN: set in .env — never hardcoded here
+    env_file:
+      - .env.docker
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('localhost',8002),timeout=3); s.close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ─── Access Reviewer / IAM (port 8003) ───────────────────────────────────
+  iam:
+    <<: *mcp-defaults
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+      args:
+        SERVER_MODULE: iam.server
+        SERVER_PORT: "8003"
+    ports:
+      - "8003:8003"
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-bhishmasec_stage}
+      PYTHONUNBUFFERED: "1"
+      no_proxy: "*"
+      NO_PROXY: "*"
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      AGENT_CALLER_ROLE: ${AGENT_CALLER_ROLE:-operator}
+    volumes:
+      - ${HOME}/.aws:/home/mcpuser/.aws:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('localhost',8003),timeout=3); s.close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ─── Ticket Resolver (port 8004) ─────────────────────────────────────────
+  ticket:
+    <<: *mcp-defaults
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+      args:
+        SERVER_MODULE: ticket.server
+        SERVER_PORT: "8004"
+    ports:
+      - "8004:8004"
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      PYTHONUNBUFFERED: "1"
+      no_proxy: "*"
+      NO_PROXY: "*"
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      # LINEAR_API_KEY: set in .env.docker — never hardcoded here
+    env_file:
+      - .env.docker
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('localhost',8004),timeout=3); s.close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ─── Migration Rehearsal / Database (port 8005) ──────────────────────────
+  database:
+    <<: *mcp-defaults
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+      args:
+        SERVER_MODULE: database.server
+        SERVER_PORT: "8005"
+    ports:
+      - "8005:8005"
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      PYTHONUNBUFFERED: "1"
+      no_proxy: "*"
+      NO_PROXY: "*"
+      http_proxy: ""
+      https_proxy: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      DATABASE_SANDBOX_PATH: /sandbox/migration_sandbox.db
+    volumes:
+      - migration-sandbox:/sandbox
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('localhost',8005),timeout=3); s.close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  mcp-net:
+    driver: bridge
+
+volumes:
+  cloud-data:
+    driver: local
+  migration-sandbox:
+    driver: local

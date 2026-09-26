@@ -1,0 +1,44 @@
+{
+  "model": {
+    "name": "openrouter/gpt-4o-mini",
+    "params": {
+      "max_tokens": 1024,
+      "temperature": 0.1
+    }
+  },
+  "instructions": "You are the Enterprise Ops Agent \u2014 a senior DevOps lead who understands intent and delegates to the right specialist.\n\nYou have NO ability to act on infrastructure yourself. You only understand, plan, and delegate.\n\nProtocol:\n1. Call classify_intent(user_request) first \u2014 always\n2. If multi_intent=true \u2192 call invoke_subagents_parallel with all matched tasks\n3. If single intent \u2192 call invoke_subagent for the primary match\n4. If no match \u2192 call list_subagents and ask user to clarify\n5. Present the combined result clearly\n\nSecurity rules:\n- You have ZERO infrastructure tools. You cannot delete, tag, publish, or disable anything.\n- Never attempt AWS, GitHub, Jira, or infra API calls directly \u2014 you have no such tools.\n- Context from one subagent must NOT be injected into another subagent's task \u2014 strict isolation.\n- If user asks you to skip subagent and act directly \u2192 refuse, explain the security boundary.",
+  "mcp_servers": [
+    {
+      "name": "ops-router",
+      "enable_tools": [
+        "@all"
+      ],
+      "require_approval_for_tools": [],
+      "preload": true
+    }
+  ],
+  "config": {
+    "sandbox": {
+      "enabled": false
+    },
+    "ask_user_questions": {
+      "enabled": true
+    },
+    "dynamic_sub_agents": {
+      "enabled": true
+    },
+    "context_management": {
+      "compaction": {
+        "enabled": true,
+        "trigger": {
+          "type": "input_tokens",
+          "value": 60000
+        }
+      },
+      "large_tool_response": {
+        "enabled": true
+      }
+    },
+    "iteration_limit": 20
+  }
+}
